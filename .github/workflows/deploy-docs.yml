@@ -1,7 +1,7 @@
 name: Build and Deploy Doxygen Docs
 on:
   push:
-    branches: [ development ]
+    branches: [ development, codex/ci-cflfieldsens-diagnostic ]
   # pull_request: # For testing only.  Remove before merge!
   #   branches: [ development ]
 permissions:

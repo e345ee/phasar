@@ -1,6 +1,8 @@
 name: pre-commit
 
 on:
+  push:
+    branches: [ codex/ci-cflfieldsens-diagnostic ]
   pull_request:
 
 jobs:

@@ -2,7 +2,7 @@ name: Docker Image
 
 on:
   push:
-    branches: [ master, development ]
+    branches: [ master, development, codex/ci-cflfieldsens-diagnostic ]
   pull_request:
     branches: [ master, development ]
 
