@@ -35,18 +35,15 @@ jobs:
       - name: Fetch Base Branch
         shell: bash
         run: |
-          BASE_REF="${GITHUB_BASE_REF:-development}"
-          git fetch --depth=1 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          git fetch --depth=1 origin +refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}
 
       - name: Run Tool
         shell: bash
         run: |
-          BASE_REF="${GITHUB_BASE_REF:-development}"
-          FILES=$(git diff --name-only --diff-filter=AM "origin/${BASE_REF}" HEAD | egrep "${{ matrix.regex }}" || true)
+          FILES=$(git diff --name-only --diff-filter=AM origin/${{ github.base_ref }} HEAD | egrep "${{ matrix.regex }}" || true)
           [ -z "$FILES" ] || (${{ matrix.command }} $FILES && git diff --diff-filter=M $FILES)
 
       - name: Add Suggestions
-        if: github.event_name == 'pull_request'
         uses: reviewdog/action-suggester@v1
         with:
           tool_name: ${{ matrix.tool }}
