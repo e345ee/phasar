@@ -1,0 +1,93 @@
+name: CFLFieldSens stress reproduction
+
+on:
+  push:
+    branches: [ codex/ci-cflfieldsens-diagnostic ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repeat-release-llvm16-unittests:
+    name: Repeat ubuntu-24.04 Release LLVM16 unittests 10x
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: stress-${{ github.sha }}-${{ github.job }}-ubuntu-24.04-llvm16-release
+
+      - name: Install Phasar Dependencies
+        shell: bash
+        run: |
+          ./utils/InstallAptDependencies.sh \
+            --llvm-version 16 \
+            --noninteractive \
+            tzdata \
+            ccache \
+            clang-20 \
+            libclang-rt-20-dev \
+            clang-tools-20
+
+      - name: Build Release LLVM16 configuration
+        env:
+          CXX: clang++-20
+          CC: clang-20
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DBUILD_PHASAR_CLANG=OFF \
+            -DPHASAR_USE_Z3=ON \
+            -DPHASAR_BUILD_MODULES=ON \
+            -DPHASAR_LLVM_VERSION=16 \
+            -DPHASAR_ENABLE_DYNAMIC_LOG=OFF \
+            -DPHASAR_BUILD_DYNLIB=ON \
+            -DPHASAR_ENABLE_SANITIZERS=ON \
+            -G Ninja
+          ninja -C build
+
+      - name: Repeat failing unittest target
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p ci-stress-logs
+
+          for iteration in $(seq 1 10); do
+            echo "::group::check-phasar-unittests iteration ${iteration}/10"
+            set +e
+            cmake --build ./build --target check-phasar-unittests 2>&1 \
+              | tee "ci-stress-logs/check-phasar-unittests-${iteration}.log"
+            status=${PIPESTATUS[0]}
+            set -e
+            echo "::endgroup::"
+
+            cp -R build/unittests/Testing "ci-stress-logs/Testing-${iteration}" 2>/dev/null || true
+
+            if [ "${status}" -ne 0 ]; then
+              echo "check-phasar-unittests failed on iteration ${iteration} with exit code ${status}" \
+                | tee "ci-stress-logs/failure-summary.txt"
+              exit "${status}"
+            fi
+          done
+
+      - name: Upload stress logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cflfieldsens-stress-logs
+          path: ci-stress-logs/
+          if-no-files-found: warn
+          retention-days: 7
